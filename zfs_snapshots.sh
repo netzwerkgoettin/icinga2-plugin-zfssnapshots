@@ -10,9 +10,10 @@ STATE_CRITICAL=2
 STATE_UNKNOWN=3
 
 ##---- Ensure we're using GNU tools
-DATE="/usr/gnu/bin/date"
-GREP="/usr/gnu/bin/grep"
-WC="/usr/gnu/bin/wc"
+TAIL=$({ which gtail || which tail; } | tail -1)
+DATE=$({ which gdate || which date; } | $TAIL -1)
+GREP=$({ which ggrep || which grep; } | $TAIL -1)
+WC=$({ which gwc || which wc; } | $TAIL -1)
 
 read -d '' USAGE <<- _EOF_
 $PROG [ -c <critical_hours> ] [ -w <warning_hours> ] -d <dataset>
@@ -61,11 +62,12 @@ _EOF_
 }
 
 _get_last_snapshot() {
-  zfs list -r -t snapshot -o name -s creation $1|grep -v zrep|tail -n 1| tail -c 11
+	TMP=$(zfs list -r -t snapshot -o name -s creation $1|grep -v zrep|$TAIL -n 1| cut -d\@ -f2)
+	$DATE +%s --date="$(echo $TMP | tr '-' ' ' | tr '.' '-')"
 }
 
 _count_all_snapshots() {
-  zfs list -r -t snapshot -o name "$1"|$GREP -v zrep|tail +2|$WC -l
+  zfs list -r -t snapshot -o name "$1"|$GREP -v zrep|$TAIL +2|$WC -l
 }
 
 _count_snapshots() {
@@ -114,8 +116,10 @@ if [ $ARETHEREANY -eq 0 ] ; then
   exit $STATE_CRITICAL
 fi
 
+set -x
 CREATION_DATE=$(_get_last_snapshot $ZFS_DATASET)
 DIFF=$(( NOW - CREATION_DATE ))
+set +x
 
 ##----------- Informational output follows
 read -d '' FYI <<- _EOF_
