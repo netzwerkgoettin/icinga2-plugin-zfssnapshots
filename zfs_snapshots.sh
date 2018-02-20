@@ -139,10 +139,8 @@ if [ $ARETHEREANY -eq 0 ] ; then
   exit $STATE_CRITICAL
 fi
 
-set -x
 CREATION_DATE=$(_get_last_snapshot $ZFS_DATASET)
 DIFF=$(( NOW - CREATION_DATE ))
-set +x
 
 ##----------- Informational output follows
 read -d '' FYI <<- _EOF_
