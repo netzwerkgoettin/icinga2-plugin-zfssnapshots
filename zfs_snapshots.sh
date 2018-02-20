@@ -10,9 +10,10 @@ STATE_CRITICAL=2
 STATE_UNKNOWN=3
 
 ##---- Ensure we're using GNU tools
-DATE="/usr/gnu/bin/date"
-GREP="/usr/gnu/bin/grep"
-WC="/usr/gnu/bin/wc"
+TAIL=$({ which gtail || which tail; } | tail -1)
+DATE=$({ which gdate || which date; } | $TAIL -1)
+GREP=$({ which ggrep || which grep; } | $TAIL -1)
+WC=$({ which gwc || which wc; } | $TAIL -1)
 
 read -d '' USAGE <<- _EOF_
 $PROG [ -c <critical_hours> ] [ -w <warning_hours> ] -d <dataset>
@@ -61,15 +62,39 @@ _EOF_
 }
 
 _get_last_snapshot() {
-  zfs list -r -t snapshot -o name -s creation $1|grep -v zrep|tail -n 1| tail -c 11
+    $DATE +%s --date="$(zfs list -r -t snapshot -o creation -s creation $1|grep -v zrep|$TAIL -n 1)"
 }
 
 _count_all_snapshots() {
-  zfs list -r -t snapshot -o name "$1"|$GREP -v zrep|tail +2|$WC -l
+  zfs list -H -r -t snapshot -o name "$1" | $GREP -v zrep | $WC -l
 }
 
 _count_snapshots() {
-  zfs list -r -t snapshot -o name "$1"|$GREP -v zrep|$GREP "$2"|$WC -l
+  case $2 in
+    "hourly") TYPE=3600; ;;
+    "daily") TYPE=86400; ;;
+    "weekly") TYPE=604800; ;;
+    "monthly") TYPE=2419200; ;;
+    "yearly") TYPE=29030400; ;;
+  esac
+  unset OLDDATE
+  CNT=0
+  zfs list -H -r -t snapshot -o creation $1 | \
+    while read WDAY MON DAY TIME YEAR; do
+      gdate +%s --date="$WDAY $MON $DAY $TIME $YEAR"
+    done | sort | \
+    while read DATE; do
+      [ "${OLDDATE}" ] || {
+        OLDDATE=$DATE
+        continue
+      }
+      DIFF=$(echo "($DATE - $OLDDATE)" | bc)
+      if [ $DIFF -ge $TYPE ] && [ $DIFF -le $(( $TYPE * 3 )) ]; then
+        CNT=$(( $CNT + 1 ))
+      fi
+      OLDDATE=$DATE
+      echo $CNT
+    done | tail -1
 }
 
 _getopts $@
@@ -102,6 +127,7 @@ NOW=$($DATE +%s)
 
 ##----------- Some statistics
 COUNT_HOURLY=$(_count_snapshots $ZFS_DATASET hourly)
+sleep 10
 COUNT_DAILY=$(_count_snapshots $ZFS_DATASET daily)
 COUNT_WEEKLY=$(_count_snapshots $ZFS_DATASET weekly)
 COUNT_MONTHLY=$(_count_snapshots $ZFS_DATASET monthly)
