@@ -70,7 +70,7 @@ _count_all_snapshots() {
 }
 
 _count_snapshots() {
-  case $1 in
+  case $2 in
     "hourly") TYPE=3600; ;;
     "daily") TYPE=86400; ;;
     "weekly") TYPE=604800; ;;
@@ -80,21 +80,21 @@ _count_snapshots() {
   unset OLDDATE
   CNT=0
   zfs list -H -r -t snapshot -o creation rootpool/export/home | \
-  while read WDAY MON DAY TIME YEAR; do
-    gdate +%s --date="$WDAY $MON $DAY $TIME $YEAR"
-  done | sort | \
-  while read DATE; do
-    [ "${OLDDATE}" ] || {
+    while read WDAY MON DAY TIME YEAR; do
+      gdate +%s --date="$WDAY $MON $DAY $TIME $YEAR"
+    done | sort | \
+    while read DATE; do
+      [ "${OLDDATE}" ] || {
+        OLDDATE=$DATE
+        continue
+      }
+      DIFF=$(echo "($DATE - $OLDDATE)" | bc)
+      if [ $DIFF -ge $TYPE ] && [ $DIFF -le $(( $TYPE * 3 )) ]; then
+        CNT=$(( $CNT + 1 ))
+      fi
       OLDDATE=$DATE
-      continue
-    }
-    DIFF=$(echo "($DATE - $OLDDATE)" | bc)
-    if [ $DIFF -ge $TYPE ] && [ $DIFF -le $(( $TYPE * 3 )) ]; then
-      CNT=$(( $CNT + 1 ))
-    fi
-    OLDDATE=$DATE
-  done
-  echo $CNT
+      echo $CNT
+    done | tail -1
 }
 
 _getopts $@
@@ -127,6 +127,7 @@ NOW=$($DATE +%s)
 
 ##----------- Some statistics
 COUNT_HOURLY=$(_count_snapshots $ZFS_DATASET hourly)
+sleep 10
 COUNT_DAILY=$(_count_snapshots $ZFS_DATASET daily)
 COUNT_WEEKLY=$(_count_snapshots $ZFS_DATASET weekly)
 COUNT_MONTHLY=$(_count_snapshots $ZFS_DATASET monthly)
