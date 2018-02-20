@@ -62,8 +62,7 @@ _EOF_
 }
 
 _get_last_snapshot() {
-	TMP=$(zfs list -r -t snapshot -o name -s creation $1|grep -v zrep|$TAIL -n 1| cut -d\@ -f2)
-	$DATE +%s --date="$(echo $TMP | tr '-' ' ' | tr '.' '-')"
+    $DATE +%s --date="$(zfs list -r -t snapshot -o creation -s creation $1|grep -v zrep|$TAIL -n 1)"
 }
 
 _count_all_snapshots() {
