@@ -66,11 +66,35 @@ _get_last_snapshot() {
 }
 
 _count_all_snapshots() {
-  zfs list -r -t snapshot -o name "$1"|$GREP -v zrep|$TAIL +2|$WC -l
+  zfs list -H -r -t snapshot -o name "$1" | $GREP -v zrep | $WC -l
 }
 
 _count_snapshots() {
-  zfs list -r -t snapshot -o name "$1"|$GREP -v zrep|$GREP "$2"|$WC -l
+  case $1 in
+    "hourly") TYPE=3600; ;;
+    "daily") TYPE=86400; ;;
+    "weekly") TYPE=604800; ;;
+    "monthly") TYPE=2419200; ;;
+    "yearly") TYPE=29030400; ;;
+  esac
+  unset OLDDATE
+  CNT=0
+  zfs list -H -r -t snapshot -o creation rootpool/export/home | \
+  while read WDAY MON DAY TIME YEAR; do
+    gdate +%s --date="$WDAY $MON $DAY $TIME $YEAR"
+  done | sort | \
+  while read DATE; do
+    [ "${OLDDATE}" ] || {
+      OLDDATE=$DATE
+      continue
+    }
+    DIFF=$(echo "($DATE - $OLDDATE)" | bc)
+    if [ $DIFF -ge $TYPE ] && [ $DIFF -le $(( $TYPE * 3 )) ]; then
+      CNT=$(( $CNT + 1 ))
+    fi
+    OLDDATE=$DATE
+  done
+  echo $CNT
 }
 
 _getopts $@
