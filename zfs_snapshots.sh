@@ -79,7 +79,7 @@ _count_snapshots() {
   esac
   unset OLDDATE
   CNT=0
-  zfs list -H -r -t snapshot -o creation rootpool/export/home | \
+  zfs list -H -r -t snapshot -o creation $1 | \
     while read WDAY MON DAY TIME YEAR; do
       gdate +%s --date="$WDAY $MON $DAY $TIME $YEAR"
     done | sort | \
